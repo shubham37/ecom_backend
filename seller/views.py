@@ -9,8 +9,7 @@ from rest_framework.decorators import action
 from rest_framework.authtoken.models import Token
 
 from api.models import Role, User
-from seller.models import Seller, SellerPersonalDetail, SellerBankDetail, \
-    SellerBusinessDetail, Pincode, City
+from seller.models import Seller, SellerDetail, Pincode, City
 
 
 # Create your views here.
@@ -22,69 +21,79 @@ class SellerRegisterView(APIView):
         """
             Api for Create Student.
         """
+        data = request.data.get('formData')
+        # 1. Detail Create
+        bankCity = City.objects.filter(
+            city_name__iexact=str(data.get('bank_city', ''))
+        )
+        if not bankCity.exists():
+            bankCity = None
+        else:
+            bankCity = bankCity.last()
+
+        pincode = Pincode.objects.filter(
+            pincode=data.get('zip_code')
+        )
+        if not pincode.exists():
+            pincode = None
+        else:
+            pincode = pincode.last()
+
+        spd = dict(
+            address=data.get('address',''),
+            zip_code=pincode,
+            gst=data.get('gst',''),
+            pancard=data.get('pancard',None),
+            adharcard=data.get('adharcard',None),
+            logo=data.get('logo',None),
+            board=data.get('board',None),
+            role=data.get('role',1),
+            minimum_order=data.get('minimum_order',''),
+            category=data.get('category',1),
+            ifsc=data.get('ifsc',''),
+            bank_city=bankCity,
+            branch=data.get('branch',''),
+            account_holder=data.get('account_holder',''),
+            account_number=data.get('account_number',''),
+            bank=data.get('bank',''),
+            proof=data.get('proof','')
+        )
+
         try:
-            info_data =  request.data.get('info')
-            business_data =  request.data.get('business')
-            bank_data =  request.data.get('bank')
-
-            # 1. User Create
-            token = uuid.uuid4()
-            user = User.objects.create(
-                email=info_data.get('userid'),
-                role=Role.SELLER
-            )
-
-            # 2. Address Create
-            spd = dict(
-                user_id=user.id,
-                password=info_data.get('password'),
-                address=info_data.get('address'),
-                city=City.objects.get(
-                    id=int(info_data.get('city'))
-                ),
-                zip_code=Pincode.objects.get(
-                    id=int(info_data.get('pincode'))
-                )
-            )
-
-            spd = SellerPersonalDetail.objects.create(**spd)
-
-            # 3. Bank Details
-            sbd = dict(
-                ifsc=bank_data.get('ifsc'),
-                branch=bank_data.get('branch'),
-                acc_holder=bank_data.get('account_holder'),
-                acc_number=bank_data.get('account_number'),
-                bank_name=bank_data.get('bank'),
-                bank_proof=bank_data.get('proof')
-            )
-
-            sbd = SellerBankDetail.objects.create(**sbd)
-
-
-            # 4. busines Details
-            sbsd = dict(
-                gst=business_data.get('gst'),
-                role=business_data.get('role'),
-                minimum_home_delivery=business_data.get('minimum_order'),
-                shop_board=business_data.get('board'),
-                shop_category=business_data.get('category'),
-                pancard=business_data.get('pancard'),
-                adharCard=business_data.get('adharCard')
-            )
-
-            sbsd = SellerBusinessDetail.objects.create(**sbsd)
-
-            # 5. Token Create
-            seller = Seller.objects.create(
-                bank_detail_id=sbd.id,
-                business_detail_id=sbsd.id,
-                personal_detail_id=spd.id
-            )
-            token, _ = Token.objects.get_or_create(user=user)
-            response = {
-                "token": str(token.key)
-            }
-            return Response(data=response, status=status.HTTP_201_CREATED)
+            detail = SellerDetail.objects.create(**spd)
         except Exception as e:
             return Response(data={'error':e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+        # 2. User Create
+        try:
+            user = User.objects.create(
+                email=data.get('userid'),
+                role=Role.SELLER,
+                password=data.get('password',''),
+                number=data.get('phone','')
+            )
+        except Exception as e:
+            if detail:
+                detail.delete()
+            return Response(data={'error':e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        # 3. Seller Create
+        try:
+            seller = Seller.objects.create(
+                user=user,
+                detail=detail
+            )
+        except Exception as e:
+            if detail:
+                detail.delete()
+            if user:
+                user.delete()
+            return Response(data={'error':e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        # 4. Token Generate
+        token, _ = Token.objects.get_or_create(user=user)
+        response = {
+            "token": str(token.key)
+        }
+        return Response(data=response, status=status.HTTP_201_CREATED)
