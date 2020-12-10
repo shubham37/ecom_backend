@@ -6,7 +6,7 @@ from ecom_backend.utils import upload_image
 
 # Create your models here.
 class Category(models.Model):
-    name = models.CharField(max_length=20)
+    name = models.CharField(max_length=50)
     banner = models.ImageField(
         verbose_name='Upload Category Image',
         upload_to=upload_image,
@@ -19,7 +19,7 @@ class Category(models.Model):
 
 class PopularCategory(models.Model):
     cat = models.ForeignKey(Category, on_delete=models.CASCADE)
-    sub_title = models.CharField(max_length=10, null=True, blank=True)
+    sub_title = models.CharField(max_length=20, null=True, blank=True)
     banner = models.ImageField(
         verbose_name='Upload Category Image',
         upload_to=upload_image,
@@ -32,7 +32,7 @@ class PopularCategory(models.Model):
 
 class SubCategory(models.Model):
     cat = models.ForeignKey(Category, on_delete=models.CASCADE)
-    name = models.CharField(max_length=20)
+    name = models.CharField(max_length=50)
 
     def __str__(self):
         return self.name

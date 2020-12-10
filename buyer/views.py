@@ -92,8 +92,11 @@ class BuyerViewSet(ViewSet):
         user = request.user
         data = request.data
         user.mobile = data.get('mobile','')
-        user.save()
-        return Response(data={'detail':'updates'}, status=status.HTTP_202_ACCEPTED)
+        try:
+            user.save()
+            return Response(data={'detail':'updates'}, status=status.HTTP_202_ACCEPTED)
+        except  Exception as e:
+            return Response(data={'error':e.message}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class BuyerAddressViewSet(ViewSet):
@@ -146,14 +149,20 @@ class BuyerAddressViewSet(ViewSet):
             return Response(data={'error':e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     # update address
-    def update(self, request, id):
-        data = request.data
-        instance = self.get_object(request, id)
+    def update(self, request, *args, **kwargs):
+        data = request.data.get('address')
+        instance = self.get_object(request, kwargs.get('pk', ''))
         if instance.exists():
-            serializer = self.serializer_class(instance.last(), data=data)
             try:
-                if serializer.is_valid(raise_exception=True):
-                    serializer.update(instance, serializer.validated_data)
+                pincode = Pincode.objects.get(pincode=data.get('pincode'))
+            except Exception as e:
+                return Response(data={'error':e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            data.update({'pincode':pincode})
+            data.update({'add_type': int(data.get('add_type', 1))})
+            serializer = self.serializer_class(instance.first(), data=data)
+            try:
+                if serializer.is_valid(raise_exception=False):
+                    serializer.update(instance.first(), serializer.validated_data)
                     return Response("Update Successfull", status=status.HTTP_202_ACCEPTED)
             except Exception as e:
                 return Response(e.args, status=status.HTTP_400_BAD_REQUEST)
