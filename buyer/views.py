@@ -286,7 +286,7 @@ class BuyerWishlistViewset(ViewSet):
             )
         wish.products.add(product)
         wish.save()
-        return Response(data={'detail': 'Added to wishlist successfully Done.'}, status=status.HTTP_200_OK)
+        return Response(data={'detail': 'Added to wishlist.'}, status=status.HTTP_200_OK)
 
     def destroy(self, request, *args, **kwargs):
         wishlist = self.queryset.get(user=request.user)

@@ -10,10 +10,11 @@ from rest_framework.decorators import action
 
 from api.permissions import CustomPermission
 from product.models import Product, Category, SubCategory, ProductOptions, ShippingOptions, \
-    PriceRangeOptions, BrandsOptions, PopularCategory
+    PriceRangeOptions, BrandsOptions, PopularCategory, ProductComment
 from product.serializers import CategorySerializer, SubCategorySerializer, \
     ProductSearchSerializer, ProductSerializer, ShippingOptionSerializer, \
-        PopularCategorySerializer
+        PopularCategorySerializer, ProductDetailSerializer, ProductTemplateSerializer, \
+            ProductCommentSerializer
 
 
 class ProductViewSet(ViewSet):
@@ -29,8 +30,7 @@ class ProductViewSet(ViewSet):
     def retrieve(self, request, pk=None):
         product = self.get_object(request, pk)
         if product.exists():
-            serialized = self.serializer_class(product.last())
-            # We should add other available options
+            serialized = ProductDetailSerializer(product.last())
             return Response(serialized.data, status=status.HTTP_200_OK)
         return Response("Please Check uuid", status=status.HTTP_204_NO_CONTENT)
 
@@ -46,7 +46,7 @@ class ProductViewSet(ViewSet):
         }
 
         if viewed_products:
-            serialized_viewed = self.serializer_class(viewed_products, many=True)
+            serialized_viewed = ProductTemplateSerializer(viewed_products, many=True)
             response.update({'viewed': serialized_viewed.data})
             response.update({'popular': serialized_viewed.data})
 
@@ -66,6 +66,30 @@ class ProductViewSet(ViewSet):
             return Response(data=serialize.data, status=status.HTTP_200_OK)
         return Response(data={'detail': 'no data'}, status=status.HTTP_204_NO_CONTENT)
 
+
+class ProductCommentView(APIView):
+    permission_classes =[AllowAny, ]
+    serializer_class = ProductCommentSerializer
+    queryset = ProductComment.objects.all()
+
+    def get(self, request):
+        comments = self.queryset
+        if comments.exists():
+            serialized = self.serializer_class(comments, many=True)
+            return Response(serialized.data, status=status.HTTP_200_OK)
+        return Response("Try Again", status=status.HTTP_204_NO_CONTENT)
+
+    def post(self, request):
+        detail = request.data
+        try:
+            data = detail.get('detail')
+            data.update({
+                'product_id': int(detail.get('product_id'))
+            })
+            review = ProductComment.objects.create(**data)
+            return Response(data={'detail': "Saved"}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(data={'error': e.message}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class ShippingOptionViewSet(ViewSet):
@@ -91,35 +115,45 @@ class SearchView(APIView):
     serializer_class = ProductSearchSerializer
 
     def get(self, request):
-        print(request.GET)
-        category = request.GET.get('category', 0)
-        sub_category = request.GET.get('subcategory', 0)
+        # category = request.GET.get('category', 0)
+        # sub_category = request.GET.get('subcategory', 0)
 
-        search_term = request.GET.get('query', '') # This will compare against title, tag
+        search_term = str(request.GET.get('values', '')).strip()
 
-        price_range = request.GET.get('price_range', '')
-        brand = request.GET.get('brand', '')
-        quality = request.GET.get('quantity', '')
-        discounts = request.GET.get('discount', '')
-        feature_name = request.GET.get('feature_name', '')
-        feature_value = request.GET.get('feature_value', '')
+        # price_range = request.GET.get('price_range', '')
+        # brand = request.GET.get('brand', '')
+        # quality = request.GET.get('quantity', '')
+        # discounts = request.GET.get('discount', '')
+        # feature_name = request.GET.get('feature_name', '')
+        # feature_value = request.GET.get('feature_value', '')
+
+        # value_filter = {
+        #  'category_id': category,
+        #  'sub_category_id': sub_category
+        # }
+        if search_term:
+            products = Product.objects.filter(title__icontains=search_term)
+            if products:
+                serialize = self.serializer_class(products, many=True)
+                return Response(data=serialize.data, status=status.HTTP_200_OK)
+            return Response(data={"detail":'No Data'}, status=status.HTTP_204_NO_CONTENT)
+        return Response(data={"detail":'Query Should Not Blank'}, status=status.HTTP_400_BAD_REQUEST)
 
 
-        value_filter = {
-         'category_id': category,
-         'sub_category_id': sub_category
-        }
+class MultiSearchView(APIView):
+    permission_classes =[AllowAny, ]
+    serializer_class = ProductSearchSerializer
 
-
-        # query = (
-        #     Q(category_id=category) |
-        #     Q(sub_category_id=sub_category) |
-        #     Q(title__iexact__contain=search_term) |
-        #     Q(tags__title__iexact=search_term)
-        # )
-
-        products = Product.objects.filter(**value_filter)
-        if products:
+    def get(self, request):
+        products = request.GET.get('values', '')
+        products = list(map(lambda x: str(x).strip(), products.split(',')))
+        product_ids = []
+        for product in products:
+            if product:
+                ids = Product.objects.filter(title__icontains=product).values_list('id', flat=True)
+                product_ids.extend(ids)
+        if product_ids:
+            products = Product.objects.filter(id__in=product_ids)
             serialize = self.serializer_class(products, many=True)
             return Response(data=serialize.data, status=status.HTTP_200_OK)
         return Response(data={"detail":'No Data'}, status=status.HTTP_204_NO_CONTENT)
@@ -171,6 +205,7 @@ class CategoryViewSet(ViewSet):
                 "top_categories": serialize.data
             })
         return Response(context, status=status.HTTP_200_OK)
+
 
 class PopularCategoryViewSet(ViewSet):
     queryset = PopularCategory.objects.all()

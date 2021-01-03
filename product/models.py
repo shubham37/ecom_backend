@@ -166,15 +166,14 @@ class Product(models.Model):
         return str(self.title)
 
 class ProductComment(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    name = models.CharField(max_length=20, default=None, null=True, blank=True)
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
     comment = models.TextField(null=True, blank=True)
     rating = models.IntegerField(null=True, blank=True)
     date_comment = models.DateField(verbose_name='date of comment', auto_now_add=True)
 
-
     def __str__(self):
-        return str(self.first_name)
+        return str(self.comment)[:10]
 
 class ProductOptions(models.Model):
     indentifier = models.CharField(max_length=20)

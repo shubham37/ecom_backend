@@ -1,10 +1,15 @@
 from rest_framework import  serializers
-from api.models import State, City, Pincode        
+from api.models import State, City, Pincode, User
 
 
 class StateSerializer(serializers.ModelSerializer):
     class Meta:
         model = State
+        fields = '__all__'
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
         fields = '__all__'
 
 
