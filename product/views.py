@@ -9,7 +9,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.decorators import action
 
 from api.permissions import CustomPermission
-from product.models import Product, Category, SubCategory, ProductOptions, ShippingOptions, \
+from product.models import Product, Category, SubCategory, ShippingOptions, \
     PriceRangeOptions, BrandsOptions, PopularCategory, ProductComment
 from product.serializers import CategorySerializer, SubCategorySerializer, \
     ProductSearchSerializer, ProductSerializer, ShippingOptionSerializer, \
@@ -20,7 +20,7 @@ from product.serializers import CategorySerializer, SubCategorySerializer, \
 class ProductViewSet(ViewSet):
     queryset = Product.objects.all()
     permission_classes = (AllowAny,)
-    serializer_class = ProductSerializer
+    serializer_class = ProductTemplateSerializer
 
     def get_object(self, request, id):
         availability = self.queryset.filter(id=id)
@@ -46,7 +46,7 @@ class ProductViewSet(ViewSet):
         }
 
         if viewed_products:
-            serialized_viewed = ProductTemplateSerializer(viewed_products, many=True)
+            serialized_viewed = self.serializer_class(viewed_products, many=True)
             response.update({'viewed': serialized_viewed.data})
             response.update({'popular': serialized_viewed.data})
 
@@ -58,9 +58,20 @@ class ProductViewSet(ViewSet):
 
     @action(detail=False, methods=['GET'])
     def byCategory(self, request):
-        cat =  request.GET.get('name')
-        category = set(Category.objects.filter(name__iexact=cat).values_list('id'))
-        products = self.queryset.filter(category_id__in=category)
+        cat =  request.GET.get('category','')
+        sub_category =  request.GET.get('sub_category','')
+        filters = {}
+
+        if cat:
+            filters.update({
+                'category__name__iexact': cat
+            })
+        
+        if sub_category:
+            filters.update({
+            'sub_category__name__iexact': sub_category
+            })
+        products = self.queryset.filter(**filters)
         if products:
             serialize = self.serializer_class(products, many=True)
             return Response(data=serialize.data, status=status.HTTP_200_OK)
@@ -105,32 +116,18 @@ class ShippingOptionViewSet(ViewSet):
         product_id = id
         user = request.user
 
-        shiping_options = ProductOptions.objects.filter(product_id=product_id).values('shipping_option')
+        shiping_options = ShippingOptions.objects.filter(product_id=product_id).values('shipping_option')
         serialize = self.serializer_class(shiping_options, many=True)
         return Response(data=serialize.data, status=status.HTTP_200_OK)
 
 
 class SearchView(APIView):
     permission_classes =[AllowAny, ]
-    serializer_class = ProductSearchSerializer
+    serializer_class = ProductTemplateSerializer
 
     def get(self, request):
-        # category = request.GET.get('category', 0)
-        # sub_category = request.GET.get('subcategory', 0)
-
         search_term = str(request.GET.get('values', '')).strip()
 
-        # price_range = request.GET.get('price_range', '')
-        # brand = request.GET.get('brand', '')
-        # quality = request.GET.get('quantity', '')
-        # discounts = request.GET.get('discount', '')
-        # feature_name = request.GET.get('feature_name', '')
-        # feature_value = request.GET.get('feature_value', '')
-
-        # value_filter = {
-        #  'category_id': category,
-        #  'sub_category_id': sub_category
-        # }
         if search_term:
             products = Product.objects.filter(title__icontains=search_term)
             if products:
@@ -142,7 +139,7 @@ class SearchView(APIView):
 
 class MultiSearchView(APIView):
     permission_classes =[AllowAny, ]
-    serializer_class = ProductSearchSerializer
+    serializer_class = ProductTemplateSerializer
 
     def get(self, request):
         products = request.GET.get('values', '')

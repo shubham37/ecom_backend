@@ -288,6 +288,18 @@ class BuyerWishlistViewset(ViewSet):
         wish.save()
         return Response(data={'detail': 'Added to wishlist.'}, status=status.HTTP_200_OK)
 
+    @action(detail=True, methods=['GET'])
+    def isYour(self, request, pk=None):
+        wishlist = self.queryset.get(user=request.user)
+        if wishlist:
+            products = list(wishlist.products.values_list('id', flat=True))
+            if int(pk) in products:
+                return Response(data={'exist':True}, status=status.HTTP_200_OK)
+            else:
+                return Response(data={'exist':False}, status=status.HTTP_200_OK)
+        return Response(data={'detail':"This wishlist is not yours"}, status=status.HTTP_404_NOT_FOUND)
+
+
     def destroy(self, request, *args, **kwargs):
         wishlist = self.queryset.get(user=request.user)
         if wishlist:

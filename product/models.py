@@ -48,45 +48,6 @@ class ProductImages(models.Model):
     def __str__(self):
         return str(self.image)
 
-class ProductTags(models.Model):
-    title = models.CharField(max_length=50, null=True, blank=True)
-
-    def __str__(self):
-        return str(self.title)
-
-
-# color size,
-class FeatureOptionGroups(models.Model):
-    name = models.CharField(max_length=20)
-
-    def __str__(self):
-        return str(self.name)
-
-# red, XL
-class FeatureOptions(models.Model):
-    feature_option_group = models.ForeignKey(FeatureOptionGroups, on_delete=models.CASCADE)
-    name = models.CharField(max_length=20)
-
-    def __str__(self):
-        return str(self.name)
-
-
-# color size,
-class DiscountOptionGroups(models.Model):
-    name = models.CharField(max_length=20)
-
-    def __str__(self):
-        return str(self.name)
-
-# red, XL
-class DiscountOptions(models.Model):
-    discount_option_group = models.ForeignKey(DiscountOptionGroups, on_delete=models.CASCADE)
-    name = models.CharField(max_length=20)
-
-    def __str__(self):
-        return str(self.name)
-
-
 class ShippingOptionGroup(models.Model):
     name = models.CharField(max_length=20, null=True, blank=True)
 
@@ -146,6 +107,25 @@ class BrandsOptions(models.Model):
     brand_group = models.ForeignKey(BrandGroup, on_delete=models.CASCADE)
     brands = models.ManyToManyField(Brand, blank=True)
 
+class FilterFeature(models.Model):
+    key = models.CharField(max_length=20, verbose_name="Feature Key")
+    is_filter = models.BooleanField(default=False, verbose_name='Is Available For Filter')
+
+    def __str__(self):
+        return str(self.key)
+
+
+class Feature(models.Model):
+    name = models.CharField(max_length=20, verbose_name="Feature Name")
+    value = models.CharField(max_length=20, verbose_name="Feature Value")
+
+    def __str__(self):
+        return str(self.name) + ' -- ' + str(self.value)
+
+    def save(self, *args, **kwargs):
+        if not FilterFeature.objects.filter(key__iexact=self.name).exists():
+            filters = FilterFeature.objects.create(key=self.name)
+        super(Feature, self).save(*args, **kwargs) 
 
 class Product(models.Model):
     title = models.CharField(max_length=50, null=True, blank=True)
@@ -156,11 +136,37 @@ class Product(models.Model):
     sub_category = models.ForeignKey(SubCategory, on_delete=models.CASCADE, null=True, blank=True)
     images = models.ManyToManyField(ProductImages, blank=True)
     thumbnail = models.ForeignKey(ProductImages, related_name='thumb', null=True, blank=True, on_delete=models.CASCADE)
-    tags = models.ManyToManyField(ProductTags, blank=True)
     mrp = models.IntegerField(default=100)
     quantity = models.IntegerField(default=1)
     brand = models.ForeignKey(Brand, on_delete=models.CASCADE, null=True, blank=True)
     view_count = models.IntegerField(default=0)
+
+    def __str__(self):
+        return str(self.title)
+
+class FeatureGroup(models.Model):
+    title = models.CharField(verbose_name="Group Identifier", max_length=50)
+    features = models.ManyToManyField(Feature, related_name='features')
+    products = models.ManyToManyField(Product, related_name='product_features')
+
+    def  __str__(self):
+        return str(self.title)
+
+class DiscountType:
+    FLAT='FLAT'
+    PERCENTAGE='PERCENTAGE'
+
+
+DISCOUNT_TYPE_CHOICES = [
+    (DiscountType.FLAT, 'FLAT'),
+    (DiscountType.PERCENTAGE, 'PERCENTAGE'),
+]
+
+class DiscountGroup(models.Model):
+    title = models.CharField(max_length=20, verbose_name='Title')
+    discount_amount = models.IntegerField(verbose_name='Amount')
+    discount_type = models.CharField(max_length=15, choices=DISCOUNT_TYPE_CHOICES, default=DiscountType.FLAT, verbose_name='Discount Type')
+    products = models.ManyToManyField(Product, related_name='discount_group')
 
     def __str__(self):
         return str(self.title)
@@ -174,17 +180,4 @@ class ProductComment(models.Model):
 
     def __str__(self):
         return str(self.comment)[:10]
-
-class ProductOptions(models.Model):
-    indentifier = models.CharField(max_length=20)
-    products = models.ManyToManyField
-    features = models.ManyToManyField(FeatureOptions, blank=True)
-    discounts = models.ManyToManyField(DiscountOptions, blank=True)
-    shipping_option = models.ManyToManyField(ShippingOptions, blank=True)
-    quantity_option = models.ManyToManyField(QuantityOptions, blank=True)
-    price_range_group = models.ManyToManyField(PriceRangeGroup, blank=True)
-    brands_option = models.ManyToManyField(BrandsOptions, blank=True)
-
-    def __str__(self):
-        return str(self.identifier)
 

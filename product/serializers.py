@@ -1,3 +1,4 @@
+from django.db.models import F
 from rest_framework import  serializers
 from product.models import Category, SubCategory, Product, \
     ShippingOptions, PopularCategory, ProductComment, ProductImages
@@ -46,14 +47,16 @@ class ProductDetailSerializer(serializers.ModelSerializer):
     related_seller = serializers.SerializerMethodField()
     discount_str = serializers.SerializerMethodField()
     images = serializers.SerializerMethodField()
+    image = serializers.SerializerMethodField()
+    details = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
         fields = [
-            'id', 'title', 'description', 'images', 'view_count', 'mrp',
+            'id', 'title', 'description', 'images', 'image', 'view_count', 'mrp',
             'rating', 'review_count', 'final_price', 'shop_name', 'is_available',
             'attribute_options', 'is_linked_product', 'related_seller', 'reviews',
-            'discount_str', 'order_count'
+            'discount_str', 'order_count', 'details'
         ]
 
     def get_rating(self, obj):
@@ -66,6 +69,9 @@ class ProductDetailSerializer(serializers.ModelSerializer):
     def get_order_count(self, obj):
         return 1
 
+    def get_image(self, obj):
+        return obj.thumbnail.image.name
+
     def get_images(self, obj):        
         return ProductImagesSerializer(obj.images, many=True).data
 
@@ -76,10 +82,28 @@ class ProductDetailSerializer(serializers.ModelSerializer):
         return []
 
     def get_final_price(self, obj):
-        return 1
-
+        if obj.discount_group.exists():
+            discount_group = obj.discount_group.last()
+            if discount_group.discount_type == 'FLAT':
+               return obj.mrp -  discount_group.discount_amount
+            else:
+               return obj.mrp - (obj.mrp * discount_group.discount_amount)/100
+        return obj.mrp
+    
     def get_shop_name(self, obj):
-        return "Shop"
+        return "Shop Name"
+
+    def get_details(self, obj):
+        group = obj.product_features.all()
+        if group:
+            return group.annotate(key=F('features__name'), value=F('features__value')).values('key','value')
+        return []
+    
+    def get_discount_str(self, obj):
+        if obj.discount_group.exists():
+            discount_group = obj.discount_group.last()
+            return 'FLAT' + str(discount_group.discount_amount) if discount_group.discount_type == 'FLAT' else str(discount_group.discount_amount) +'%'
+        return ''
 
     def get_is_available(self, obj):
         return "In Stack"
@@ -92,9 +116,6 @@ class ProductDetailSerializer(serializers.ModelSerializer):
 
     def get_related_seller(self, obj):
         return []
-
-    def get_discount_str(self, obj):
-        return "15 %"
 
 
 class ProductTemplateSerializer(serializers.ModelSerializer):
@@ -109,7 +130,7 @@ class ProductTemplateSerializer(serializers.ModelSerializer):
         model = Product
         fields = [
             'id', 'title', 'image', 'view_count', 'mrp', 'category',
-            'rating', 'final_price', 'shop_name', 'discount_str'
+            'rating', 'final_price', 'shop_name', 'discount_str', 'date_added'
         ]
 
     def get_category(self, obj):
@@ -122,13 +143,22 @@ class ProductTemplateSerializer(serializers.ModelSerializer):
         return obj.thumbnail.image.name
 
     def get_final_price(self, obj):
-        return 12
+        if obj.discount_group.exists():
+            discount_group = obj.discount_group.last()
+            if discount_group.discount_type == 'FLAT':
+               return obj.mrp -  discount_group.discount_amount
+            else:
+               return obj.mrp - (obj.mrp * discount_group.discount_amount)/100
+        return obj.mrp
     
     def get_shop_name(self, obj):
         return "Shop Name"
     
     def get_discount_str(self, obj):
-        return "15 %"
+        if obj.discount_group.exists():
+            discount_group = obj.discount_group.last()
+            return 'FLAT' + str(discount_group.discount_amount) if discount_group.discount_type == 'FLAT' else str(discount_group.discount_amount) +'%'
+        return ''
 
 
 class ProductSearchSerializer(serializers.ModelSerializer):

@@ -6,10 +6,10 @@ from django.contrib.postgres.fields.jsonb import JSONField
 
 # Create your models here.
 class TrackStatus:
-    ORDERED=1
-    SHIPPED=2
-    OFD=3
-    DELIVERED=4
+    ORDERED='Ordered'
+    SHIPPED='Shipped'
+    OFD='Out For Delivery'
+    DELIVERED='Delivered'
 
 
 TRACK_STATUS_CHOICES = [
@@ -59,7 +59,7 @@ class Order(models.Model):
     total_amount = models.IntegerField(verbose_name="Sub Total", default=0)
     is_return_available = models.BooleanField(default=True)
     is_cancel_available = models.BooleanField(default=True)
-    current_status = models.IntegerField(choices=TRACK_STATUS_CHOICES, default=TrackStatus.ORDERED)
+    current_status = models.CharField(max_length=20, choices=TRACK_STATUS_CHOICES, default=TrackStatus.ORDERED)
     review = models.OneToOneField(OrderReview, on_delete=models.DO_NOTHING, null=True, blank=True)
 
     def __str__(self):
