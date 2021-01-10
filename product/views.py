@@ -10,11 +10,44 @@ from rest_framework.decorators import action
 
 from api.permissions import CustomPermission
 from product.models import Product, Category, SubCategory, ShippingOptions, \
-    PriceRangeOptions, BrandsOptions, PopularCategory, ProductComment
+    PopularCategory, ProductComment, FeatureGroup, Feature, FilterFeature, AllFeature
 from product.serializers import CategorySerializer, SubCategorySerializer, \
-    ProductSearchSerializer, ProductSerializer, ShippingOptionSerializer, \
-        PopularCategorySerializer, ProductDetailSerializer, ProductTemplateSerializer, \
-            ProductCommentSerializer
+    ShippingOptionSerializer, PopularCategorySerializer, ProductDetailSerializer, \
+        ProductTemplateSerializer, ProductCommentSerializer
+
+
+def prepared_filters(products):
+    filters = []
+    feature_group_ids = products.values_list('product_features', flat=True)
+    if feature_group_ids:
+        features = list(
+            set(
+                FeatureGroup.objects.filter(
+                    id__in=feature_group_ids
+                ).values_list('features__name', flat=True)
+            )
+        )
+
+        available_filters = list(
+            set(
+                FilterFeature.objects.filter(
+                    is_filter=True
+                ).values_list(
+                    'feature__key', flat=True
+                )
+            )
+        )
+        for feature in features:
+            if feature in available_filters:
+                values = Feature.objects.filter(name__icontains=feature).values_list('value', flat=True)
+                if values:
+                    option = {
+                        "has_data": True,
+                        'feature': str(feature).title(),
+                        'values': list(set(values))
+                    }
+                    filters.append(option)
+    return filters
 
 
 class ProductViewSet(ViewSet):
@@ -23,16 +56,18 @@ class ProductViewSet(ViewSet):
     serializer_class = ProductTemplateSerializer
 
     def get_object(self, request, id):
-        availability = self.queryset.filter(id=id)
-        return availability
+        try:
+            product = self.queryset.get(id=id)
+            return product
+        except Exception as e:
+            return None
 
-    # product by id
     def retrieve(self, request, pk=None):
         product = self.get_object(request, pk)
-        if product.exists():
-            serialized = ProductDetailSerializer(product.last())
+        if product is not None:
+            serialized = ProductDetailSerializer(product)
             return Response(serialized.data, status=status.HTTP_200_OK)
-        return Response("Please Check uuid", status=status.HTTP_204_NO_CONTENT)
+        return Response("Try Again", status=status.HTTP_204_NO_CONTENT)
 
     # popular & most viewed
     @action(detail=False, methods=['GET'])
@@ -60,6 +95,7 @@ class ProductViewSet(ViewSet):
     def byCategory(self, request):
         cat =  request.GET.get('category','')
         sub_category =  request.GET.get('sub_category','')
+        seller = request.GET.get('seller','')
         filters = {}
 
         if cat:
@@ -69,12 +105,23 @@ class ProductViewSet(ViewSet):
         
         if sub_category:
             filters.update({
-            'sub_category__name__iexact': sub_category
+                'sub_category__name__iexact': sub_category
+            })
+        if seller:
+            filters.update({
+                'seller__identifier__iexact': seller
             })
         products = self.queryset.filter(**filters)
         if products:
+
+            # Preparing Features
+            filters= prepared_filters(products)
             serialize = self.serializer_class(products, many=True)
-            return Response(data=serialize.data, status=status.HTTP_200_OK)
+            return Response(
+                data={
+                    'products': serialize.data,
+                    'filters': filters
+                }, status=status.HTTP_200_OK)
         return Response(data={'detail': 'no data'}, status=status.HTTP_204_NO_CONTENT)
 
 
@@ -127,12 +174,16 @@ class SearchView(APIView):
 
     def get(self, request):
         search_term = str(request.GET.get('values', '')).strip()
-
         if search_term:
             products = Product.objects.filter(title__icontains=search_term)
             if products:
+                filters= prepared_filters(products)
                 serialize = self.serializer_class(products, many=True)
-                return Response(data=serialize.data, status=status.HTTP_200_OK)
+                return Response(
+                    data={
+                        'products': serialize.data,
+                        'filters': filters
+                    }, status=status.HTTP_200_OK)
             return Response(data={"detail":'No Data'}, status=status.HTTP_204_NO_CONTENT)
         return Response(data={"detail":'Query Should Not Blank'}, status=status.HTTP_400_BAD_REQUEST)
 

@@ -61,58 +61,18 @@ class ShippingOptions(models.Model):
     def __str__(self):
         return str(self.name)
 
-
-class QuantityOptionGroup(models.Model):
-    name = models.CharField(max_length=20, null=True, blank=True)
-
-    def __str__(self):
-        return str(self.name)
-
-class QuantityOptions(models.Model):
-    quantity_option_group = models.ForeignKey(QuantityOptionGroup, on_delete=models.CASCADE)
-    name = models.CharField(max_length=20, null=True, blank=True)
-
-    def __str__(self):
-        return str(self.name)
-
-class PriceRangeGroup(models.Model):
-    name = models.CharField(max_length=20, null=True, blank=True)
-
-    def __str__(self):
-        return str(self.name)
-
-class PriceRangeOptions(models.Model):
-    price_range_group = models.ForeignKey(PriceRangeGroup, on_delete=models.CASCADE)
-    min_value = models.IntegerField(null=True, blank=True)
-    max_value = models.IntegerField(null=True, blank=True)
-
-    def __str__(self):
-        return str(self.min_value)
-
-
-class BrandGroup(models.Model):
-    name = models.CharField(max_length=20, null=True, blank=True)
-
-    def __str__(self):
-        return str(self.name)
-
-
-class Brand(models.Model):
-    name = models.CharField(max_length=20, null=True, blank=True)
-
-    def __str__(self):
-        return str(self.name)
-
-class BrandsOptions(models.Model):
-    brand_group = models.ForeignKey(BrandGroup, on_delete=models.CASCADE)
-    brands = models.ManyToManyField(Brand, blank=True)
-
-class FilterFeature(models.Model):
+class AllFeature(models.Model):
     key = models.CharField(max_length=20, verbose_name="Feature Key")
-    is_filter = models.BooleanField(default=False, verbose_name='Is Available For Filter')
 
     def __str__(self):
         return str(self.key)
+
+class FilterFeature(models.Model):
+    feature = models.ForeignKey(AllFeature, on_delete=models.DO_NOTHING, null=True)
+    is_filter = models.BooleanField(default=False, verbose_name='Is Available For Filter')
+
+    def __str__(self):
+        return str(self.feature)
 
 
 class Feature(models.Model):
@@ -123,8 +83,8 @@ class Feature(models.Model):
         return str(self.name) + ' -- ' + str(self.value)
 
     def save(self, *args, **kwargs):
-        if not FilterFeature.objects.filter(key__iexact=self.name).exists():
-            filters = FilterFeature.objects.create(key=self.name)
+        if not AllFeature.objects.filter(key__iexact=self.name).exists():
+            filters = AllFeature.objects.create(key=self.name)
         super(Feature, self).save(*args, **kwargs) 
 
 class Product(models.Model):
@@ -138,7 +98,7 @@ class Product(models.Model):
     thumbnail = models.ForeignKey(ProductImages, related_name='thumb', null=True, blank=True, on_delete=models.CASCADE)
     mrp = models.IntegerField(default=100)
     quantity = models.IntegerField(default=1)
-    brand = models.ForeignKey(Brand, on_delete=models.CASCADE, null=True, blank=True)
+    unit = models.CharField(max_length=10, default=None, null=True, blank=True)
     view_count = models.IntegerField(default=0)
 
     def __str__(self):

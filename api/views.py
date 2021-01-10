@@ -244,7 +244,7 @@ class PincodeViewSet(ViewSet):
             "pincodes": None
         }
         if self.queryset.exists():
-            serialize = self.serializer_class(self.queryset(), many=True)
+            serialize = self.serializer_class(self.queryset, many=True)
             context.update({
                 "is_success": serialize.data,
                 "pincodes": True

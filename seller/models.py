@@ -59,13 +59,7 @@ class SellerDetail(models.Model):
     role = models.IntegerField(choices=SELLER_ROLE_CHOICES, default=SellerRole.RETAILER)
     minimum_order = models.IntegerField(null=True, blank=True)
     category = models.IntegerField(choices=SHOP_CATEGORY_CHOICES, default=ShopCategory.BOTH)
-    pincodes = models.CharField(max_length=15, null=True, blank=True)
-    # pincode_file = models.FileField(
-    #     verbose_name='Upload Servicable Pincode File',
-    #     upload_to=upload_image,
-    #     null=True, blank=True
-    # )
-    # is_file_readed = models.BooleanField(default=True)
+    pincodes = models.CharField(max_length=256, null=True, blank=True)
     ifsc = models.CharField(max_length=20, null=True, blank=True)
     bank_city = models.CharField(max_length=20, null=True, blank=True)
     branch = models.CharField(max_length=20, null=True, blank=True)

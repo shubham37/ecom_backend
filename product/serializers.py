@@ -1,8 +1,8 @@
 from django.db.models import F
 from rest_framework import  serializers
 from product.models import Category, SubCategory, Product, \
-    ShippingOptions, PopularCategory, ProductComment, ProductImages
-
+    ShippingOptions, PopularCategory, ProductComment, ProductImages, \
+        FeatureGroup, Feature, FilterFeature, AllFeature
 from api.serializers import UserSerializer
 
 
@@ -20,7 +20,6 @@ class ProductImagesSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductImages
         fields = '__all__'
-
 
 class PopularCategorySerializer(serializers.ModelSerializer):
     class Meta:
@@ -49,6 +48,9 @@ class ProductDetailSerializer(serializers.ModelSerializer):
     images = serializers.SerializerMethodField()
     image = serializers.SerializerMethodField()
     details = serializers.SerializerMethodField()
+    shipping = serializers.SerializerMethodField()
+    seller = serializers.SerializerMethodField()
+    seller_address = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
@@ -56,11 +58,20 @@ class ProductDetailSerializer(serializers.ModelSerializer):
             'id', 'title', 'description', 'images', 'image', 'view_count', 'mrp',
             'rating', 'review_count', 'final_price', 'shop_name', 'is_available',
             'attribute_options', 'is_linked_product', 'related_seller', 'reviews',
-            'discount_str', 'order_count', 'details'
+            'discount_str', 'order_count', 'details', 'shipping', 'seller', 'seller_address'
         ]
 
     def get_rating(self, obj):
         return 1
+
+    def get_seller_address(self, obj):
+        return obj.seller.detail.address or ''
+
+    def get_seller(self, obj):
+        return obj.seller.identifier or ''
+
+    def get_shipping(self, obj):
+        return obj.seller.detail.category
     
     def get_review_count(self, obj):
         reviews = ProductComment.objects.filter(product_id=obj.id).count()
@@ -91,7 +102,7 @@ class ProductDetailSerializer(serializers.ModelSerializer):
         return obj.mrp
     
     def get_shop_name(self, obj):
-        return "Shop Name"
+        return obj.seller.detail.shop_name or ''
 
     def get_details(self, obj):
         group = obj.product_features.all()
@@ -117,7 +128,6 @@ class ProductDetailSerializer(serializers.ModelSerializer):
     def get_related_seller(self, obj):
         return []
 
-
 class ProductTemplateSerializer(serializers.ModelSerializer):
     image = serializers.SerializerMethodField()
     rating = serializers.SerializerMethodField()
@@ -125,17 +135,44 @@ class ProductTemplateSerializer(serializers.ModelSerializer):
     final_price = serializers.SerializerMethodField()
     shop_name = serializers.SerializerMethodField()
     discount_str = serializers.SerializerMethodField()
+    features = serializers.SerializerMethodField()
+    shipping = serializers.SerializerMethodField()
+    seller = serializers.SerializerMethodField()
+    seller_address = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
         fields = [
             'id', 'title', 'image', 'view_count', 'mrp', 'category',
-            'rating', 'final_price', 'shop_name', 'discount_str', 'date_added'
+            'rating', 'final_price', 'shop_name', 'discount_str', 'date_added',
+            'unit', 'features', 'shipping', 'seller', 'seller_address'
         ]
 
     def get_category(self, obj):
         return str(obj.category.name)
-    
+
+    def get_seller(self, obj):
+        return obj.seller.identifier or ''
+
+    def get_seller_address(self, obj):
+        return obj.seller.detail.address or ''
+
+    def get_shipping(self, obj):
+        return obj.seller.detail.category
+
+    def get_features(self, obj):
+        features = []
+        if obj.product_features.all():
+            feature_group_ids = list(obj.product_features.values_list('id', flat=True))
+            if feature_group_ids:
+                features = FeatureGroup.objects.filter(
+                    id__in=feature_group_ids
+                ).annotate(
+                    key=F('features__name'),
+                    value=F('features__value')
+                ).values('key','value')
+        return features
+
     def get_rating(self, obj):
         return 1
 
@@ -152,7 +189,7 @@ class ProductTemplateSerializer(serializers.ModelSerializer):
         return obj.mrp
     
     def get_shop_name(self, obj):
-        return "Shop Name"
+        return obj.seller.detail.shop_name or ''
     
     def get_discount_str(self, obj):
         if obj.discount_group.exists():
@@ -160,21 +197,9 @@ class ProductTemplateSerializer(serializers.ModelSerializer):
             return 'FLAT' + str(discount_group.discount_amount) if discount_group.discount_type == 'FLAT' else str(discount_group.discount_amount) +'%'
         return ''
 
-
-class ProductSearchSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Product
-        fields = '__all__'
-        depth = 3
-
-class ProductSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Product
-        fields = '__all__'
-        depth = 2
-
 class ShippingOptionSerializer(serializers.ModelSerializer):
     class Meta:
         model = ShippingOptions
         fields = '__all__'
         depth = 1
+

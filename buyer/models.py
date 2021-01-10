@@ -63,6 +63,7 @@ class Buyer(models.Model):
     date_joined = models.DateField(verbose_name='User Joined', auto_now_add=True)
     addresses = models.ManyToManyField(UserAddress, blank=True)
     cards = models.ManyToManyField(Card, blank=True)
+    is_seller = models.BooleanField(default=False)
 
     def __str__(self):
         return str(self.first_name)

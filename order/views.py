@@ -1,7 +1,11 @@
-from dateutil.relativedelta import relativedelta
 import datetime
 import random
 import string
+import hashlib
+import hmac
+import base64
+from dateutil.relativedelta import relativedelta
+from django.shortcuts import render
 
 from rest_framework.views import APIView
 from rest_framework.viewsets import ViewSet
@@ -157,3 +161,48 @@ class OrderViewSet(ViewSet):
                 return Response(data={'detail': "Try Again"}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response(data={'error': e.message}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class PaymentBack(APIView):
+    permission_classes = [AllowAny,]
+
+    def post(self, request):
+        print(request.data)
+
+    def get(self, request):
+        appId = settings.PAYMENT_APP_ID
+        secretKey = settings.PAYMENT_SECRET_KEY
+        customerEmail = request.user.email
+        customerPhone = request.user.number
+        orderId = "OID" +''.join([random.choice(string.ascii_letters 
+        + string.digits) for n in range(7)])
+
+        orderAmount = request.GET['orderAmount']
+
+        data = "appId=" + appId + "&orderId=" + orderId + "&orderAmount=" + orderAmount + "&customerEmail=" + customerEmail + "&customerPhone=" + customerPhone + "&orderCurrency=INR";
+        message = bytes(data).encode('utf-8')
+        secret = bytes(secretKey).encode('utf-8')
+        paymentToken = base64.b64encode(hmac.new(secret, message,digestmod=hashlib.sha256).digest())
+
+        data = {}
+        data.appId = appId
+        data.secretKey = secretKey
+        data.customerEmail = customerEmail
+        data.customerPhone = customerPhone
+        data.orderId = orderId
+        data.notifyurl = 'https://localhost:8000/orders/payment/'
+        data.returnurl = 'https://localhost:8000/orders/payment/'
+        data.orderNote = 'Note'
+
+        data.paymentOption = "card";
+        data.card = {};
+        # data.card.number = document.getElementById("card-num").value; 
+        # data.card.expiryMonth = document.getElementById("card-mm").value;
+        # data.card.expiryYear = document.getElementById("card-yyyy").value;
+        # data.card.holder = document.getElementById("card-name").value;
+        # data.card.cvv = document.getElementById("card-cvv").value;
+        # CashFree.paySeamless(data);
+
+        return paymentToken
+
+

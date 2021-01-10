@@ -19,24 +19,19 @@ class SellerRegisterView(APIView):
     permission_classes = (AllowAny,)
     parser_class = (FileUploadParser,)
 
+    def prepare_pincodes(self, user_pincodes):
+        pincodes = ''
+        if user_pincodes:
+            for pincode in user_pincodes.split(','):
+                if str(pincode).strip():
+                    pincodes= pincodes + ',' + str(pincode).strip()        
+        return pincodes
+
+
     def post(self, request, format=None):
         data = request.data
 
-        # bankCity = City.objects.filter(
-        #     city_name__iexact=str(data.get('bank_city', ''))
-        # )
-        # if not bankCity.exists():
-        #     bankCity = None
-        # else:
-        #     bankCity = bankCity.last()
-
-        # pincode = Pincode.objects.filter(
-        #     pincode=data.get('zip_code')
-        # )
-        # if not pincode.exists():
-        #     pincode = None
-        # else:
-        #     pincode = pincode.last()
+        pincodes = self.prepare_pincodes(str(data.get('pincode_file')) + ',' + str(data.get('pincodes')))
 
         detail = dict(
             shop_name=data.get('shop_name'),
@@ -53,8 +48,7 @@ class SellerRegisterView(APIView):
             role=int(data.get('role',1)),
             minimum_order=data.get('minimum_order',0),
             category=int(data.get('category',1)),
-            pincodes=data.get('pincodes'),
-            # pincode_file=data.get('pincode_file'),
+            pincodes=pincodes,
             ifsc=data.get('ifsc'),
             bank_city=data.get('bank_city'),
             branch=data.get('branch'),
@@ -137,3 +131,26 @@ class SellerStoreView(APIView):
 
         serialized = self.serializer_class(store)
         return Response(data=serialized.data, status=status.HTTP_200_OK)
+
+
+class IsDeliveryPossibleView(APIView):
+
+    permission_classes = [AllowAny,]
+
+    def post(self, request):
+        delivery_pincode = request.data['delivery_pincode']
+        seller = request.data['seller']
+        response = {
+            'is_deliverable': False,
+            'charge': 0
+        }
+        sd = SellerDetail.objects.filter(seller__identifier=seller)
+        if sd and delivery_pincode:
+            servicable_pincodes = sd.last().pincodes
+            if servicable_pincodes and delivery_pincode.get('pincode')['pincode'] in servicable_pincodes:
+                response = {
+                    'is_deliverable': True,
+                    'charge': 100
+                }
+        return Response(data=response, status=status.HTTP_200_OK)
+
